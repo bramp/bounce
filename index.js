@@ -1,3 +1,17 @@
+/*
+ * TODO
+ *   The shapes don't seem centered, they are slightly to the left.
+ *   Make a neon theme
+ *   Ensure the center of the ball is in the middle (to ensure bounce is correct)
+ *   Implement power ups
+ *   Add rounded corners to the edges of the walls
+ *   Make the balls follow the curved bottom wall.
+ *   Effects when shape disappears
+ *   Particle Effects
+ *   Changes shapes to use the native rotation, not use drawing each shape differently.
+ *   Sound!
+ *   Webpack
+ */
 "use strict"
 
 const DEBUG = true;
@@ -15,8 +29,6 @@ const wallColour = 0xffffff;
 const slideHeight = 240 * factor;
 const slideOpening = sideWidth; // 100 * factor;
 
-//let playWidth = config.width - 2 * sideWidth - 2 * wallWidth; // ~921
-
 const ballRadius = 24 * factor;
 const shapeSpacing = 100 * factor;
 const shapeRadius = [
@@ -26,12 +38,50 @@ const shapeRadius = [
     80 * factor, // Pentagon
 ];
 
+const ballFireVelociy = 40;
+
+const BALL_STATE = {
+    WAITING: 1,           // Waiting to be loaded
+    LOADED: 2,            // In the process of being loaded to fired.
+    INPLAY: 3,            // Bouncing around in play
+    MOVING_TO_WAITING: 4, // Moving back to the top
+}
+
+const COLLISION_CAT = {
+    BALL_WAITING: 1,
+    BALL_INPLAY:  2,
+    GAME_OBJECT:  4, // Shapes and walls
+}
+
+
+// TODO Move to library
+// Returns the nearest object in objects, to the coordinates (x,y).
+function findNearest(objects, x, y) {
+    if (objects.length === 0) {
+        return;
+    }
+
+    let closest = 0;
+    let closestDistance = Phaser.Math.Distance.Squared(x, y, objects[0].x, objects[0].y);
+
+    // Find nearest ball to the shooter, and move it.
+    for (let i = 1; i < objects.length; i++) {
+        const d = Phaser.Math.Distance.Squared(x, y, objects[i].x, objects[i].y);
+        if (d < closestDistance) {
+            closest = i;
+            closestDistance = d;
+        }
+    }
+
+    return objects[closest];
+}
 
 // TODO We could implement a custom plugin to make it easy to create balls
 // e.g https://labs.phaser.io/edit.html?src=src%5Cplugins%5Ccustom%20game%20object.js
+// TODO Make the Ball class also setup the matter body
 class Ball extends Phaser.GameObjects.PathFollower {
     constructor (scene, x, y) {
-        super(scene, null, x, y, 'ball');
+        super(scene, null, x, y, 'ball_waiting');
 
         this.radius = ballRadius;
         this.strength = 1;
@@ -39,6 +89,45 @@ class Ball extends Phaser.GameObjects.PathFollower {
         // Previous value of isStatic(), and the number of in progress following.
         this._isFollowingCount = 0;
         this._wasStatic = null;
+    }
+
+    setState(newState) {
+        if (this.state === newState) {
+            return;
+        }
+        console.log("state: ", newState);
+
+        if (newState === BALL_STATE.WAITING) {
+            this.body.collisionFilter = {
+                group: 0,
+                category: COLLISION_CAT.BALL_WAITING,
+                mask: COLLISION_CAT.BALL_WAITING | COLLISION_CAT.GAME_OBJECT,
+            }
+            this.scene.textures.setTexture(this, 'ball_waiting');
+
+        } else if (newState === BALL_STATE.LOADED) {
+            console.assert(this.state === BALL_STATE.WAITING, "Ball moved to FIRING state from invalid state:", this.state);
+            this.scene.textures.setTexture(this, 'ball_inplay');
+            this.setStatic(true);
+
+        } else if (newState === BALL_STATE.INPLAY) {
+            this.body.collisionFilter = {
+                group: 0,
+                category: COLLISION_CAT.BALL_INPLAY,
+                mask: COLLISION_CAT.GAME_OBJECT,
+            }
+            this.scene.textures.setTexture(this, 'ball_inplay');
+            this.setStatic(false);
+
+        } else if (newState === BALL_STATE.MOVING_TO_WAITING) {
+            console.assert(this.state === BALL_STATE.INPLAY, "Ball moved to MOVING_TO_WAITING state from invalid state:", this.state);
+            this.scene.textures.setTexture(this, 'ball_waiting');
+            this.setStatic(false);
+
+        } else {
+            console.assert(false, "Invalid new state: ", newState)
+        }
+        this.state = newState
     }
 
     // TODO turn the following into a MatterPathFollower Mixin.
@@ -96,7 +185,12 @@ class Ball extends Phaser.GameObjects.PathFollower {
         }
         return null;
     }
+
+    debugString() {
+        return `Ball(x: ${this.x}, y: ${this.y}, state: ${this.state})`
+    }
 }
+
 
 class Shape extends Phaser.GameObjects.Container {
     static color(lives) {
@@ -187,27 +281,43 @@ class GameScene extends Phaser.Scene {
         this.level = 1;
         
         this._score = 0;
-        this.scoreText; // GameObject displaying the score
+
+        // GameObjects
+        this.scoreText; // Displaying the score
+        this.shooter;    // The line/arrow for the shooter
+        this.shooterBox; // The invisible box (where the shooter is)
 
         this.balls = [];
-        this.shapes = []; // List of all shapes. TODO Do we need this?
+        this.shapes = []; // List of all shapes.
     }
 
     preload ()
     {
+        this.drawBallGraphics();
+    }
+
+    // TODO Make a static method of ball
+    drawBallGraphic(name, color) {
         // Draw the ball
-        const graphics = this.add.graphics(0, 0);
-        graphics.fillStyle(0xFFFFFF, 1.0);
-        graphics.fillCircle(ballRadius, ballRadius, ballRadius);
+        const graphics = this.add.graphics(0, 0)
+            .fillStyle(color, 1.0)
+            .fillCircle(ballRadius, ballRadius, ballRadius);
 
         // A little spot on the ball (to see angular spin)
         if (DEBUG) {
-            graphics.fillStyle(0xFF0000, 1.0);
-            graphics.fillCircle(ballRadius / 2, ballRadius / 2, ballRadius / 2); 
+            graphics
+                .fillStyle(0xFF0000, 1.0)
+                .fillCircle(ballRadius / 2, ballRadius / 2, ballRadius / 2);
         }
 
-        graphics.generateTexture('ball', ballRadius*2, ballRadius*2);
-        graphics.destroy();
+        graphics
+            .generateTexture(name, ballRadius*2, ballRadius*2)
+            .destroy();
+    }
+
+    drawBallGraphics() {
+        this.drawBallGraphic('ball_inplay', 0xFFFFFF);
+        this.drawBallGraphic('ball_waiting', 0xFFFF00);
     }
 
     create ()
@@ -230,43 +340,15 @@ class GameScene extends Phaser.Scene {
                     this.shapeHit(shape, ball);
 
                 } else if (bodyA.label === 'ball' && bodyB.label === 'wall_bottom') {
-                    // Float the ball back to the top of the screen.
-
                     const ball = bodyA.gameObject;
-                    let path = new Phaser.Curves.Path();
 
-                    const y_bottom = config.height - ball.y - wallBottom + sideWidth / 2;
-                    const y_top = -ball.y;
-
-                    if (ball.x < config.width / 2) {
-                        // On the left
-                        const x = -ball.x + sideWidth / 2;
-                        path
-                            .lineTo(x, y_bottom) // TODO Turn this into a curve
-                            .lineTo(x, y_top)
-                            .lineTo(-ball.x + config.width / 4, y_top);
-
-                    } else {
-                        // On the right
-                        const x = -ball.x + config.width - sideWidth / 2;
-                        path
-                            .lineTo(x, y_bottom) // TODO Turn this into a curve
-                            .lineTo(x, y_top)
-                            .lineTo(-ball.x + 3 * config.width / 4, y_top);
-                    }
-
-                    ball.setPath(path, {
-                        onComplete: function(tween, targets, param) {
-                            // TODO
-                            console.log("complete");
-                        },
-                    });
+                    this.ballFell(ball);
 
                 } else if (DEBUG) {
-                    if (bodyA.label === 'ball' && (bodyB.label === 'wall' || bodyB.label === 'slide')) {
+                    if (bodyA.label === 'ball' && (bodyB.label === 'wall' || bodyB.label === 'slide' || bodyB.label === 'ball' || bodyB.label === 'shooter')) {
                         // Ignore
                     } else {
-                        console.log("other", bodyA, bodyB);
+                        console.log("unknown collisionstart", bodyA, bodyB);
                     } 
                 }
             }
@@ -275,27 +357,89 @@ class GameScene extends Phaser.Scene {
 
         this.createWalls();
         this.createSlides();
-        //this.createCeilings();
+        this.createShooter();
         this.createShapes();
+        this.createBall();
+        this.createBall();
         this.createBall();
         this.createScore();
 
-        // TODO setup setCollisionCategory / setCollidesWith
+        this.setupControls();
 
-        /*
-        cursors = this.input.keyboard.createCursorKeys();
-        */
+        this.nextLevel();
+//        this.nextLevel();
+//        this.nextLevel();
+    }
 
+    setupControls() {
         this.input.on('pointermove', function (pointer) {
-            this.balls[0].setPosition(pointer.x, pointer.y);
-            //console.log(this.balls[0].body.velocity);
+            this.shooter.setTo(0, 0, pointer.x - this.shooter.x, pointer.y - this.shooter.y);
+        }, this);
+
+        this.input.on('pointerup', function (pointer) {
+            console.log("fire");
+
+            const angle = Phaser.Math.Angle.BetweenPoints(this.shooter, pointer);
+            const velocity_x = Math.cos(angle) * ballFireVelociy;
+            const velocity_y = Math.sin(angle) * ballFireVelociy;
+
+            this.fire(velocity_x, velocity_y);
         }, this);
     }
 
-    update ()
-    {
+    // Fire all the balls with the specific velocity.
+    fire(velocity_x, velocity_y) {
+        // Find next firing ball
+        const next = this.balls.find((ball) => ball.state === BALL_STATE.LOADED);
+        console.assert(next, "No balls to fire: ", this.balls.map((ball) => ball.debugString()));
 
+        this.fireBall(next, velocity_x, velocity_y);
     }
+
+    fireBall(ball, velocity_x, velocity_y) {
+        console.assert(ball instanceof Ball, "Argument is not a ball: ", ball);
+        console.assert(ball.state === BALL_STATE.LOADED);
+
+        ball.setState(BALL_STATE.INPLAY);
+        ball.setVelocity(velocity_x, velocity_y);
+
+        console.log(ball.x, ball.y);
+
+        // Queue up the next ball.
+        this.loadBall(function (ball) {
+            // Once the ball is queued, FIRE!
+            this.fireBall(ball, velocity_x, velocity_y);
+        });
+    }
+
+    // Load the next available ball
+    // Callback is called when the ball is loaded.
+    loadBall(loadedCallback) {
+        const waitingBalls = this.balls.filter((ball) => ball.state == BALL_STATE.WAITING);
+        let ball = findNearest(waitingBalls, this.shooter.x, this.shooter.y);
+
+        if (ball) {
+            const path = new Phaser.Curves.Path()
+                .lineTo(this.shooterBox.x - ball.x, this.shooterBox.y - ball.y);
+
+            ball.setPath(path, {
+                callbackScope: this,
+                duration: 200, // ms // TODO Make a constant
+                onComplete: function(tween, targets) {
+                    ball.setState(BALL_STATE.LOADED);
+
+                    if (loadedCallback) {
+                        loadedCallback.call(this, ball);
+                    }
+                },
+            });
+        } else {
+            // TODO Do we need to do something if there are no balls ready to load?
+        }
+    }
+
+
+    update () {}
 
     createScore() {
         this.scoreText = this.add.text(16, 16, 'Score: 0', {
@@ -310,10 +454,16 @@ class GameScene extends Phaser.Scene {
         this.matter.world.setBounds(
             sideWidth + wallWidth, 0,                              
             config.width - (sideWidth + wallWidth) * 2, config.height);
-        this.matter.world.walls.left.label   = 'wall';
-        this.matter.world.walls.right.label  = 'wall';
-        this.matter.world.walls.top.label    = 'wall';
-        this.matter.world.walls.bottom.label = 'wall';
+
+        for(let position in this.matter.world.walls) {
+            const wall = this.matter.world.walls[position];
+            wall.label = 'wall';
+            wall.collisionFilter = {
+                group: 0,
+                category: COLLISION_CAT.GAME_OBJECT,
+                mask: COLLISION_CAT.BALL_INPLAY | COLLISION_CAT.BALL_WAITING,
+            }
+        }
 
         // Create the left/right wall graphics with no physic bodies (since its handled above)
         // Left
@@ -356,6 +506,10 @@ class GameScene extends Phaser.Scene {
                     xOffset: 0,
                     yOffset: 0.5, // Mid point because `points`` is twice the height of `wall`.
                 }
+            },
+            collisionFilter: {
+                category: COLLISION_CAT.GAME_OBJECT,
+                mask: COLLISION_CAT.BALL_INPLAY | COLLISION_CAT.BALL_WAITING,
             }
         });
 
@@ -387,7 +541,8 @@ class GameScene extends Phaser.Scene {
                 verts: points,
             },
             collisionFilter: {
-                mask: 1,
+                category: COLLISION_CAT.BALL_WAITING,
+                mask: COLLISION_CAT.BALL_WAITING,
             },
         });
 
@@ -421,8 +576,8 @@ class GameScene extends Phaser.Scene {
                 verts: points,
             },
             collisionFilter: {
-                category: 2,
-                mask: 0,
+                category: COLLISION_CAT.GAME_OBJECT,
+                mask: COLLISION_CAT.BALL_INPLAY,
             },
         });
 
@@ -456,25 +611,57 @@ class GameScene extends Phaser.Scene {
         const rightCeiling = this.createCeiling(right - slideWidth, wallTop, rightSlope);
     }
 
+    createShooter() {
+        // The ceiling area that stops a ball re-entering the slide area
+        const ceiling = this.add.zone(
+            config.width/2, wallTop + slideHeight - slideOpening/4,
+            2*slideOpening, slideOpening/2);
+        this.matter.add.gameObject(ceiling, {
+            isStatic: true,
+            label: 'ceiling',
+            collisionFilter: {
+                category: COLLISION_CAT.GAME_OBJECT,
+                mask: COLLISION_CAT.BALL_INPLAY,
+            },
+        });
+
+        // The area that shoots the ball down
+        this.shooterBox = this.add.zone(
+            config.width/2, wallTop + slideHeight + slideOpening/4,
+            2*slideOpening, slideOpening/2);
+        this.matter.add.gameObject(this.shooterBox, {
+            isStatic: true,
+            label: 'shooter',
+            collisionFilter: {
+                category: COLLISION_CAT.BALL_WAITING,
+                mask: COLLISION_CAT.BALL_WAITING,
+            },
+        });
+
+        // The shooter arrow
+        this.shooter = this.add.line(
+            this.shooterBox.x, this.shooterBox.y,
+            0, 0, 0, 0,
+            0xffffff);
+
+    }
  
     createBall() {
-        const ball = new Ball(this, 50, 100);
+        const ball = new Ball(this, config.width/2, wallTop);
 
         this.add.existing(ball);
         this.matter.add.gameObject(ball, {
             shape: {
                 type: 'circle',
             },
-            collisionFilter: {
-                category: 1,
-                mask: 1,
-            }
         });
 
         ball.body.label = 'ball';
         ball.setBounce(1);
         ball.setFriction(0.5, 0, 0);
+        ball.setState(BALL_STATE.WAITING);
 
+        this.ballsWaiting++; // TODO maybe move that into update state (or just get rid of it)
         this.balls.push(ball);
     }
 
@@ -509,8 +696,8 @@ class GameScene extends Phaser.Scene {
                             radius: shape.width / 2,
                         },
                         collisionFilter: {
-                            category: 1,
-                            mask: 1,
+                            category: COLLISION_CAT.GAME_OBJECT,
+                            mask: COLLISION_CAT.BALL_INPLAY,
                         }
                     });
                 } else {
@@ -523,8 +710,8 @@ class GameScene extends Phaser.Scene {
                             verts: shape.pathData,
                         },
                         collisionFilter: {
-                            category: 1,
-                            mask: 1,
+                            category: COLLISION_CAT.GAME_OBJECT,
+                            mask: COLLISION_CAT.BALL_INPLAY,
                         }
                     });
                 }
@@ -548,6 +735,60 @@ class GameScene extends Phaser.Scene {
     set score(x) {
         this._score = x;
         this.scoreText.setText('Score: ' + this._score);
+    }
+
+    // Returns if all the balls are waiting.
+    allBallsWaiting() {
+        return this.balls.every((ball) => ball.state === BALL_STATE.WAITING);
+    }
+
+    // Progress to the next level, raising the shapes, and loading the shooter
+    nextLevel() {
+        console.assert(this.allBallsWaiting());
+
+        // TODO Move all shapes up
+        // TODO Check if shape hit the top (aka game over)
+
+        this.loadBall();
+    }
+
+    // Called when a ball falls out of play
+    ballFell(ball) {
+        // Float the ball back to the top of the screen.
+        let path = new Phaser.Curves.Path();
+
+        const y_bottom = config.height - ball.y - wallBottom + sideWidth / 2;
+        const y_top = -ball.y;
+
+        // TODO maybe make it go up the side it was moving in.
+        if (ball.x < config.width / 2) {
+            // On the left
+            const x = -ball.x + sideWidth / 2;
+            path
+                .lineTo(x, y_bottom) // TODO Turn this into a curve
+                .lineTo(x, y_top)
+                .lineTo(-ball.x + config.width / 4, y_top);
+
+        } else {
+            // On the right
+            const x = -ball.x + config.width - sideWidth / 2;
+            path
+                .lineTo(x, y_bottom) // TODO Turn this into a curve
+                .lineTo(x, y_top)
+                .lineTo(-ball.x + 3 * config.width / 4, y_top);
+        }
+
+        ball.setState(BALL_STATE.MOVING_TO_WAITING);
+        ball.setPath(path, {
+            callbackScope: this,
+            onComplete: function() {
+                ball.setState(BALL_STATE.WAITING);
+
+                if (this.allBallsWaiting()) {
+                    this.nextLevel();
+                }
+            },
+        });
     }
 
     // The shape and the ball hit
