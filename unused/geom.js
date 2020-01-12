@@ -58,3 +58,38 @@
 
         return points;
     }
+
+
+  // Calculates the centroid of this polygon.
+  // https://en.wikipedia.org/wiki/Centroid#Of_a_polygon
+  // TODO Send PR to add to Phaser.Geom.Polygon()
+  function centroid(points) {
+    let p = new Phaser.Geom.Polygon(points);
+
+    let cx = 0;
+    let cy = 0;
+
+    for (let i = 0; i < points.length - 1; i++)
+    {
+        const p1 = points[i];
+        const p2 = points[i + 1];
+
+        const factor = (p1.x * p2.y - p2.x * p1.y);
+
+        cx += (p1.x + p2.x) * factor;
+        cy += (p1.y + p2.y) * factor;
+    }
+
+    const p1 = points[0];
+    const p2 = points[points.length - 1];
+
+    const factor = (p1.x * p2.y - p2.x * p1.y);
+
+    cx += (p1.x + p2.x) * factor;
+    cy += (p1.y + p2.y) * factor;
+
+    return {
+      x: cx / (6 * p.area),
+      y: cy / (6 * p.area),
+    }
+  }

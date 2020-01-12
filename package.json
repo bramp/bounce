@@ -1,15 +1,49 @@
 {
   "name": "bounce",
   "version": "1.0.0",
-  "description": "",
+  "description": "Bouncing game",
+  "author": "",
+  "private": true,
+  "license": "MIT",
+  "keywords": [],
   "main": "index.js",
+  "scripts": {
+    "build": "webpack",
+    "watch": "webpack --watch",
+    "dev": "webpack-dev-server",
+    "lint": "eslint --fix './src/**/*.js'"
+  },
   "dependencies": {
     "phaser": "^3.21.0"
   },
-  "devDependencies": {},
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "devDependencies": {
+    "@babel/core": "^7.0.0",
+    "@babel/preset-env": "^7.0.0",
+    "babel-eslint": "^9.0.0",
+    "babel-loader": "^8.0.2",
+    "browser-sync": "^2.18.13",
+    "browser-sync-webpack-plugin": "^2.2.2",
+    "copy-webpack-plugin": "^5.1.1",
+    "clean-webpack-plugin": "^3.0.0",
+    "eslint": "^5.5.0",
+    "eslint-config-standard": "^12.0.0",
+    "eslint-plugin-import": "^2.7.0",
+    "eslint-plugin-node": "^7.0.1",
+    "eslint-plugin-promise": "^4.0.0",
+    "eslint-plugin-standard": "^4.0.0",
+    "expose-loader": "^0.7.3",
+    "webpack": "^4.41.5",
+    "webpack-cli": "^3.3.10",
+    "webpack-dev-server": "^3.10.1"
   },
-  "author": "",
-  "license": "MIT"
+  "cordova": {
+    "platforms": [
+      "android",
+      "browser",
+      "ios"
+    ],
+    "plugins": {
+      "cordova-plugin-whitelist": {}
+    }
+  }
 }

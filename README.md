@@ -1,8 +1,25 @@
-To run:
-	python -m SimpleHTTPServer
+# Install
 
+```shell
+npm install
+```
 
-Deps
-	https://github.com/schteppe/poly-decomp.js
-		// To decompose a concave vertices into a convex one.
-		var decomp = require('poly-decomp');
+# Dev
+
+```shell
+npm run dev
+
+# go to http://localhost:8080/
+```
+
+# Lint
+
+```shell
+npm run lint
+```
+
+# Build
+
+```shell
+npm run build
+```
