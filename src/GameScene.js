@@ -22,7 +22,9 @@ export class GameScene extends Phaser.Scene {
     this.shooter = null; // The line/arrow for the shooter
     this.shooterBox = null; // The invisible box (where the shooter is)
 
-    this.balls = [];
+    this.deathEmitter = null; // Particle emittor for when a shap is destroyed.
+
+    this.balls = [];  // List of all the balls.
     this.shapes = []; // List of all shapes.
   }
 
@@ -74,24 +76,7 @@ export class GameScene extends Phaser.Scene {
     this.createRowOfShapes(3);
     this.level+=4;
 
-// TODO
-    let particles = this.add.particles('ball_inplay');
-
-    particles.createEmitter({
-        alpha: { start: 1, end: 0 },
-        scale: { start: 0.5, end: 2.5 },
-        //tint: { start: 0xff945e, end: 0xff945e }, // TODO use tint!
-        speed: 20,
-        accelerationY: -300,
-        angle: { min: -85, max: -95 },
-        rotate: { min: -180, max: 180 },
-        lifespan: { min: 1000, max: 1100 },
-        blendMode: 'ADD',
-        frequency: 110,
-        maxParticles: 10,
-        x: 400,
-        y: 300
-    });
+    this.deathEmitter = this.add.particles('ball_inplay');
 
     this.loadBall();
   }
@@ -638,6 +623,23 @@ export class GameScene extends Phaser.Scene {
     };
 
     if (shape.lives <= 0) {
+      const b = shape.getBounds();
+      this.deathEmitter.createEmitter({
+          alpha: { start: 1, end: 0 },
+          scale: 0.5,
+          //tint: { start: 0xff945e, end: 0xff945e }, // TODO use tint!
+          speed: 20,
+          //accelerationY: { min: -300, max: 300 },
+          angle: { min: 0, max: 360 },
+          rotate: { min: -180, max: 180 },
+          lifespan: { min: 1000, max: 1100 },
+          blendMode: 'ADD',
+          frequency: 0,
+          maxParticles: 10,
+          x: b.x, // { min: b.left, max: b.right },
+          y: b.y, // { min: b.top, max: b.bottom }
+      });
+
       shape
         .setActive(false)
         .setVisible(false)
