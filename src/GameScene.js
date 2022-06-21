@@ -24,37 +24,13 @@ export class GameScene extends Phaser.Scene {
 
     this.deathEmitter = null; // Particle emittor for when a shap is destroyed.
 
-    this.balls = [];  // List of all the balls.
+    this.balls = []; // List of all the balls.
     this.shapes = []; // List of all shapes.
   }
 
   preload () {
-    this.drawBallGraphics();
-  }
-
-  // TODO Make a static method of Ball
-  drawBallGraphic (name, color) {
-    // Draw the ball
-    const radius = constants.ballRadius;
-    const graphics = this.add.graphics(0, 0)
-      .fillStyle(color, 1.0)
-      .fillCircle(radius, radius, radius);
-
-    // A little spot on the ball (to see angular spin)
-    if (constants.DEBUG) {
-      graphics
-        .fillStyle(0xFF0000, 1.0)
-        .fillCircle(radius / 2, radius / 2, radius / 2);
-    }
-
-    graphics
-      .generateTexture(name, radius * 2, radius * 2)
-      .destroy();
-  }
-
-  drawBallGraphics () {
-    this.drawBallGraphic('ball_inplay', 0xFFFFFF);
-    this.drawBallGraphic('ball_waiting', 0xFFFF00);
+    Ball.GenerateTextures(this);
+    Shape.GenerateTextures(this);
   }
 
   create () {
@@ -74,9 +50,9 @@ export class GameScene extends Phaser.Scene {
 
     // Start with a few rows of shapes.
     this.createRowOfShapes(3);
-    this.level+=4;
+    this.level += 4;
 
-    this.deathEmitter = this.add.particles('ball_inplay');
+    this.deathEmitter = this.add.particles('ball');
 
     this.loadBall();
   }
@@ -102,11 +78,9 @@ export class GameScene extends Phaser.Scene {
           }
 
           this.shapeHit(shape, ball);
-
         } else if (bodyA.label === 'ball' && bodyB.label === 'wall_bottom') {
           const ball = bodyA.gameObject;
           this.ballFell(ball);
-
         } else if (constants.DEBUG) {
           if (bodyA.label === 'ball' && (bodyB.label === 'wall' || bodyB.label === 'slide' || bodyB.label === 'ball' || bodyB.label === 'shooter' || bodyB.label === 'ceiling')) {
             // Ignore
@@ -195,7 +169,7 @@ export class GameScene extends Phaser.Scene {
     ]);
 
     const b = Phaser.Geom.Rectangle.FromPoints(points);
-    
+
     this.matter.add.gameObject(wall, {
       isStatic: true,
       label: 'wall_bottom',
@@ -208,7 +182,7 @@ export class GameScene extends Phaser.Scene {
         sprite: {
           // I don't understand what's happening here. xOffset must be 0, but yOffset is the ratio.
           xOffset: 0, // b.width / (b.width + wall.width),
-          yOffset: b.height / (b.height + wall.height),
+          yOffset: b.height / (b.height + wall.height)
         }
       },
       collisionFilter: {
@@ -268,8 +242,8 @@ export class GameScene extends Phaser.Scene {
     const cleft = left - slideWidth / constants.slideHeight * constants.wallThickness;
     const cright = right + slideWidth / constants.slideHeight * constants.wallThickness;
     const ceiling = this.add.zone(config.width / 2, 0,
-       cright - cleft, constants.slideHeight + constants.wallThickness);
-    
+      cright - cleft, constants.slideHeight + constants.wallThickness);
+
     // Draw a trapezoid (with constants.wallThickness padding, to ensure no balls leak though).
     const points = [
       new Phaser.Math.Vector2(cleft, 0),
@@ -294,7 +268,7 @@ export class GameScene extends Phaser.Scene {
     // Nudge the position buy the centerOfMass (to align it correctly :/)
     ceiling.setPosition(
       config.width / 2,
-      (constants.wallTop + constants.wallThickness) / 2,
+      (constants.wallTop + constants.wallThickness) / 2
     );
 
     return ceiling;
@@ -319,7 +293,6 @@ export class GameScene extends Phaser.Scene {
       new Phaser.Math.Vector2(-slideWidth, constants.slideHeight));
 
     this.createSlide(right - slideWidth, constants.wallTop, rightSlope);
-
   }
 
   createShooter () {
@@ -385,45 +358,13 @@ export class GameScene extends Phaser.Scene {
       }
 
       for (let i = 0; i < cols; i++) {
-        const sides = Phaser.Math.Between(2, 5);
+        const sides = Phaser.Math.Between(2, 5); // TODO make min/max constants
         const rotation = Phaser.Math.FloatBetween(0, 2 * Math.PI);
         const strength = Phaser.Math.Between(1, 3); // TODO
 
         const radius = constants.shapeRadius[sides - 2];
 
-        let shape;
-        if (sides === 2) {
-          // A two sided polygon doesn't exist, lets use a circle instead.
-          shape = new Shape(this, x, y, rotation, 1, strength, radius);
-
-          // TODO Should the following be moved into the Shape class?
-          this.matter.add.gameObject(shape, {
-            isStatic: true,
-            shape: { // https://cubap.github.io/phaser3-docs/physics_matter-js_components_SetBody.js.html
-              type: 'circle',
-              radius: radius,
-            },
-            collisionFilter: {
-              category: COLLISION_CAT.GAME_OBJECT,
-              mask: COLLISION_CAT.BALL_INPLAY
-            }
-          });
-        } else {
-          shape = new Shape(this, x, y, rotation, sides, strength, radius);
-          this.matter.add.gameObject(shape, {
-            isStatic: true,
-            shape: {
-              // API Documented here: https://cubap.github.io/phaser3-docs/physics_matter-js_components_SetBody.js.html
-              type: 'fromVerts',
-              verts: shape.pathData
-            },
-            collisionFilter: {
-              category: COLLISION_CAT.GAME_OBJECT,
-              mask: COLLISION_CAT.BALL_INPLAY
-            }
-          });
-        }
-        shape.body.label = 'shape';
+        let shape = new Shape(this, x, y, rotation, sides === 2 ? 1 : sides, strength, radius);
 
         this.add.existing(shape);
         this.shapes.push(shape);
@@ -461,7 +402,7 @@ export class GameScene extends Phaser.Scene {
   nextLevel (callback) {
     console.assert(this.allBallsWaiting());
 
-    this.moveShapesUp(function() {
+    this.moveShapesUp(function () {
       this.createRowOfShapes();
 
       if (callback) {
@@ -474,7 +415,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   // Moves all shapes up, and calls callback once done.
-  moveShapesUp(callback) {
+  moveShapesUp (callback) {
     // TODO Perhaps make these constants (or calculated once).
     const config = this.sys.game.config;
     const playWidth = config.width - 2 * (constants.wallWidth + constants.sideWidth);
@@ -544,7 +485,7 @@ export class GameScene extends Phaser.Scene {
         ball.setState(Ball.STATE_WAITING);
 
         if (this.allBallsWaiting()) {
-          this.nextLevel(function(){
+          this.nextLevel(function () {
             this.loadBall();
           });
         }
@@ -625,19 +566,19 @@ export class GameScene extends Phaser.Scene {
     if (shape.lives <= 0) {
       const b = shape.getBounds();
       this.deathEmitter.createEmitter({
-          alpha: { start: 1, end: 0 },
-          scale: 0.5,
-          //tint: { start: 0xff945e, end: 0xff945e }, // TODO use tint!
-          speed: 20,
-          //accelerationY: { min: -300, max: 300 },
-          angle: { min: 0, max: 360 },
-          rotate: { min: -180, max: 180 },
-          lifespan: { min: 1000, max: 1100 },
-          blendMode: 'ADD',
-          frequency: 0,
-          maxParticles: 10,
-          x: b.x, // { min: b.left, max: b.right },
-          y: b.y, // { min: b.top, max: b.bottom }
+        alpha: { start: 1, end: 0 },
+        scale: 0.5,
+        // tint: { start: 0xff945e, end: 0xff945e }, // TODO use tint!
+        speed: 20,
+        // accelerationY: { min: -300, max: 300 },
+        angle: { min: 0, max: 360 },
+        rotate: { min: -180, max: 180 },
+        lifespan: { min: 1000, max: 1100 },
+        blendMode: 'ADD',
+        frequency: 0,
+        maxParticles: 10,
+        x: b.x, // { min: b.left, max: b.right },
+        y: b.y // { min: b.top, max: b.bottom }
       });
 
       shape

@@ -50,8 +50,8 @@
     function circleOnLine(cx, cy, cr, x1, y1, x2, y2) {
       // is either end INSIDE the circle?
       // if so, return true immediately
-      const inside1 = pointOnCircle(x1, y1, cx, cy, cr);
-      const inside2 = pointOnCircle(x2, y2, cx, cy, cr);
+      const inside1 = pointInCircle(x1, y1, cx, cy, cr);
+      const inside2 = pointInCircle(x2, y2, cx, cy, cr);
       if (inside1 || inside2) return true;
 
       // get length of the line
@@ -89,9 +89,65 @@
     }
 
     // https://www.jeffreythompson.org/collision-detection/point-circle.php
-    function pointOnCircle(x, y, cx, cy, cr) {
+    function pointInCircle(x, y, cx, cy, cr) {
       const dX = x - cx;
       const dY = y - cy;
 
       return (dX * dX) + (dY * dY) <= (cr * cr);
     }
+
+
+// Returns -1 if x is negative, otherwise 1.
+// Similar to Math.sign, but never returns zero.
+function sgn(x) {
+  if (x < 0) {
+    return -1;
+  }
+  return 1;
+}
+
+// Returns between 0 and 2 points where the segment intercepts the line.
+function circleSegmentIntersection(c, segment) {
+  const i = circleLineIntersection(c, segment);
+  return i;
+}
+
+// Returns between 0 and 2 points where the segment intercepts the line.
+// http://mathworld.wolfram.com/Circle-LineIntersection.html
+function circleLineIntersection(c, segment) { // TODO Change to line
+  console.log(c, segment);
+  const dx = segment.end.x - segment.start.x;
+  const dy = segment.end.y - segment.start.y;
+  const dr = dx*dx + dy*dy;
+
+  // Shift everything by the circle center
+  const d  = (segment.start.x - c.x) * (segment.end.y - c.y) - (segment.end.x - c.x) * (segment.start.y - c.y);
+  const d2 = d * d;
+  const r2 = c.r * c.r;
+  const rdd = r2 * dr - d2;
+
+  if (rdd < 0) {
+    // No intersections
+    return [];
+  }
+
+  const rdd_sqrt = Math.sqrt(rdd);
+
+  let answer = [];
+
+  // Solve '+' equation
+  answer.push({
+      x: (d * dy + sgn(dy) * dx * rdd_sqrt) / dr + c.x,
+      y: (-d * dx + Math.abs(dy) * dx * rdd_sqrt) / dr + c.y,
+  });
+
+  if (rdd > 0) {
+    // Two intersections (solve '-' equation)
+    answer.push({
+        x: (d * dy - sgn(dy) * dx * rdd_sqrt) / dr + c.x,
+        y: (-d * dx - Math.abs(dy) * dx * rdd_sqrt) / dr + c.y,
+    });
+  }
+
+  return answer;
+}

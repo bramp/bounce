@@ -8,7 +8,7 @@ import COLLISION_CAT from './collision';
 // TODO Make the Ball class also setup the matter body
 export class Ball extends Phaser.GameObjects.PathFollower {
   constructor (scene, x, y) {
-    super(scene, null, x, y, 'ball_waiting');
+    super(scene, null, x, y, 'ball');
 
     this.radius = constants.ballRadius; // TODO Pass this in as a argument (not a constant)
     this.strength = 1;
@@ -20,11 +20,11 @@ export class Ball extends Phaser.GameObjects.PathFollower {
 
   setState (newState) {
     if (this.state === newState) {
-      console.log("Warning: reset to same state: ", this.debugString());
+      console.log('Warning: reset to same state: ', this.debugString());
       return;
     }
 
-    //console.log(`State transition ${this.state} -> ${newState}: `, this.debugString());
+    // console.log(`State transition ${this.state} -> ${newState}: `, this.debugString());
 
     if (newState === Ball.STATE_WAITING) {
       this.body.collisionFilter = {
@@ -32,13 +32,13 @@ export class Ball extends Phaser.GameObjects.PathFollower {
         category: COLLISION_CAT.BALL_WAITING,
         mask: COLLISION_CAT.BALL_WAITING | COLLISION_CAT.GAME_OBJECT
       };
-      this.scene.textures.setTexture(this, 'ball_waiting');
-
+      this.setTint(0xffff00); // TODO setup constant for this colour.
+      this.setStatic(false);
     } else if (newState === Ball.STATE_LOADED) {
       console.assert(this.state === Ball.STATE_WAITING, 'Ball moved to LOADED state from invalid state:', this.state);
-      this.scene.textures.setTexture(this, 'ball_inplay');
+      // this.scene.textures.setTexture(this, 'ball_inplay');
+      this.setTint(0xffffff);
       this.setStatic(true);
-
     } else if (newState === Ball.STATE_INPLAY) {
       console.assert(this.state === Ball.STATE_LOADED, 'Ball moved to INPLAY state from invalid state:', this.state);
 
@@ -47,21 +47,19 @@ export class Ball extends Phaser.GameObjects.PathFollower {
         category: COLLISION_CAT.BALL_INPLAY,
         mask: COLLISION_CAT.GAME_OBJECT
       };
-      this.scene.textures.setTexture(this, 'ball_inplay');
+      this.setTint(0xffffff);
       this.setStatic(false);
-
     } else if (newState === Ball.STATE_MOVING_TO_WAITING) {
       console.assert(this.state === Ball.STATE_INPLAY, 'Ball moved to MOVING_TO_WAITING state from invalid state:', this.state);
-      this.scene.textures.setTexture(this, 'ball_waiting');
+      this.setTint(0xffff00);
       this.setStatic(false);
-
     } else {
       console.assert(false, 'Invalid new state: ', newState);
     }
     this.state = newState;
   }
 
-  advancePathFollower() {
+  advancePathFollower () {
     let tween = this.pathTween;
     let pathVector = this.pathVector;
     this.path.getPoint(tween.getValue(), pathVector);
@@ -135,6 +133,25 @@ export class Ball extends Phaser.GameObjects.PathFollower {
     return `Ball(id: ${id} x: ${this.x}, y: ${this.y}, state: ${this.state})`;
   }
 }
+
+Ball.GenerateTextures = function (scene) {
+  // Draw a single white ball
+  const radius = constants.ballRadius;
+  const graphics = scene.add.graphics(0, 0)
+    .fillStyle(0xffffff, 1.0)
+    .fillCircle(radius, radius, radius);
+
+  // A little spot on the ball (to see angular spin)
+  if (constants.DEBUG) {
+    graphics
+      .fillStyle(0xFF0000, 1.0)
+      .fillCircle(radius / 2, radius / 2, radius / 2);
+  }
+
+  graphics
+    .generateTexture('ball', radius * 2, radius * 2)
+    .destroy();
+};
 
 Ball.STATE_WAITING = 1; // Waiting to be loaded
 Ball.STATE_LOADED = 2; // In the process of being loaded to fired.

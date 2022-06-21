@@ -11,7 +11,8 @@
     "build": "webpack",
     "watch": "webpack --watch",
     "dev": "webpack-dev-server",
-    "lint": "eslint --fix './src/**/*.js'"
+    "lint": "eslint --fix './src/**/*.js'",
+    "test": "ava"
   },
   "dependencies": {
     "phaser": "^3.21.0"
@@ -19,18 +20,21 @@
   "devDependencies": {
     "@babel/core": "^7.0.0",
     "@babel/preset-env": "^7.0.0",
+    "ava": "^2.4.0",
     "babel-eslint": "^9.0.0",
     "babel-loader": "^8.0.2",
     "browser-sync": "^2.18.13",
     "browser-sync-webpack-plugin": "^2.2.2",
-    "copy-webpack-plugin": "^5.1.1",
     "clean-webpack-plugin": "^3.0.0",
-    "eslint": "^5.5.0",
+    "copy-webpack-plugin": "^5.1.1",
+    "eslint": "^5.16.0",
     "eslint-config-standard": "^12.0.0",
+    "eslint-plugin-ava": "^9.0.0",
     "eslint-plugin-import": "^2.7.0",
     "eslint-plugin-node": "^7.0.1",
     "eslint-plugin-promise": "^4.0.0",
     "eslint-plugin-standard": "^4.0.0",
+    "esm": "^3.2.25",
     "expose-loader": "^0.7.3",
     "webpack": "^4.41.5",
     "webpack-cli": "^3.3.10",
@@ -45,5 +49,23 @@
     "plugins": {
       "cordova-plugin-whitelist": {}
     }
+  },
+  "ava": {
+    "require": [
+      "esm"
+    ]
+  },
+  "eslintConfig": {
+    "extends": "plugin:ava/recommended",
+    "env": {
+      "es6": true
+    },
+    "parserOptions": {
+      "ecmaVersion": 2020,
+      "sourceType": "module"
+    },
+    "plugins": [
+      "ava"
+    ]
   }
 }
